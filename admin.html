@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Lodge Manager v3 · Collapsible Houses</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{
+      --ink:#0f1312;--ink-2:#3d4947;--ink-3:#6b7877;
+      --surface:#f5f7f6;--card:#ffffff;--border:#e0e6e4;--border-strong:#c2ccc9;
+      --green-deep:#0b4d3a;--green-mid:#1a7a5c;--green-light:#e8f4ef;--green-bright:#22c987;
+      --amber:#d97706;--amber-bg:#fef3c7;
+      --red:#dc2626;--red-bg:#fee2e2;
+      --blue:#1d6fcf;--blue-bg:#eff6ff;
+      --purple:#7c3aed;--purple-bg:#f5f3ff;
+      --r-sm:8px;--r-md:14px;--r-lg:20px;
+      --shadow:0 1px 3px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.05);
+      --sidebar-w:224px;--bottom-bar:64px;
+    }
+    html,body{height:100%}
+    body{background:var(--surface);color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6;overflow-x:hidden}
+
+    /* ── LAYOUT ── */
+    .app{display:flex;min-height:100vh}
+    .sidebar{width:var(--sidebar-w);background:var(--green-deep);color:white;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform 0.3s}
+    .sidebar-brand{padding:22px 18px 18px;border-bottom:1px solid rgba(255,255,255,0.1)}
+    .brand-icon{width:34px;height:34px;background:var(--green-bright);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:9px}
+    .brand-name{font-size:14px;font-weight:700;letter-spacing:-0.3px}
+    .brand-sub{font-size:10px;color:rgba(255,255,255,0.45);margin-top:1px}
+    .sidebar-nav{flex:1;padding:10px 8px;overflow-y:auto}
+    .nav-section{font-size:9px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.8px;padding:12px 10px 4px}
+    .nav-item{display:flex;align-items:center;gap:9px;padding:10px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:13px;font-weight:500;color:rgba(255,255,255,0.65);transition:all 0.15s;margin-bottom:1px;user-select:none}
+    .nav-item:hover{background:rgba(255,255,255,0.08);color:white}
+    .nav-item.active{background:rgba(255,255,255,0.15);color:white}
+    .nav-item svg{width:17px;height:17px;flex-shrink:0;opacity:0.75}
+    .nav-item.active svg{opacity:1}
+    .nav-badge{margin-left:auto;background:var(--red);color:white;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;min-width:18px;text-align:center}
+    .sidebar-footer{padding:14px;border-top:1px solid rgba(255,255,255,0.08)}
+    .version-badge{font-size:10px;color:rgba(255,255,255,0.25);text-align:center}
+
+    .main{flex:1;margin-left:var(--sidebar-w);display:flex;flex-direction:column;min-height:100vh}
+    .topbar{background:var(--card);border-bottom:1px solid var(--border);padding:13px 26px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+    .topbar-left{display:flex;align-items:center;gap:11px}
+    .menu-btn{display:none;background:none;border:none;cursor:pointer;padding:4px;color:var(--ink-2);border-radius:var(--r-sm)}
+    .menu-btn svg{width:20px;height:20px;display:block}
+    .page-title{font-size:16px;font-weight:700;letter-spacing:-0.3px}
+    .topbar-right{display:flex;gap:8px;align-items:center}
+    .content{padding:22px 26px;flex:1}
+    .page{display:none;animation:fadeUp 0.2s ease}
+    .page.active{display:block}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+    /* ── BOTTOM NAV (mobile) ── */
+    .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+    .bottom-nav-inner{display:flex}
+    .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px;cursor:pointer;color:var(--ink-3);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;transition:color 0.15s;user-select:none;border:none;background:none;position:relative}
+    .bnav-item svg{width:20px;height:20px}
+    .bnav-item.active{color:var(--green-mid)}
+    .bnav-dot{position:absolute;top:6px;right:calc(50% - 14px);width:7px;height:7px;background:var(--red);border-radius:50%;border:2px solid var(--card);display:none}
+    .bnav-dot.show{display:block}
+
+    .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;backdrop-filter:blur(2px)}
+    .drawer-overlay.open{display:block}
+
+    /* ── STATS ── */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+    .stat-chip{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;box-shadow:var(--shadow)}
+    .stat-num{font-size:21px;font-weight:700;letter-spacing:-0.5px;color:var(--ink)}
+    .stat-lbl{font-size:10px;color:var(--ink-3);margin-top:2px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+    .stat-chip.accent{background:var(--green-deep);border-color:var(--green-deep)}
+    .stat-chip.accent .stat-num{color:#fff}
+    .stat-chip.accent .stat-lbl{color:rgba(255,255,255,0.5)}
+    .stat-delta{font-size:10px;margin-top:3px;font-weight:600}
+    .stat-delta.up{color:var(--green-mid)}
+    .stat-delta.down{color:var(--red)}
+
+    /* ── CARDS ── */
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow);margin-bottom:14px}
+    .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .card-title{font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:0.3px}
+    .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+    /* ── HOUSE BLOCKS (collapsible) ── */
+    .house-block{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:14px;box-shadow:var(--shadow)}
+    .house-block-header{background:var(--green-deep);color:white;padding:14px 18px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;cursor:pointer;user-select:none;transition:background 0.15s}
+    .house-block-header:hover{background:#0c5b43}
+    .house-block-name{font-weight:700;font-size:14px;pointer-events:none}
+    .house-block-meta{font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;pointer-events:none}
+    .house-toggle{pointer-events:none;color:rgba(255,255,255,0.7)}
+    .house-hdr-btns{display:flex;gap:6px;flex-shrink:0;pointer-events:auto}
+    .house-hdr-btns button{pointer-events:auto}
+    .house-block-body{transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;max-height:0;opacity:0;overflow:hidden;padding:0 14px}
+    .house-block-body.open{max-height:5000px;opacity:1;padding:14px}
+    .house-block-body-inner{transition:all 0.2s}
+    .room-section{margin-bottom:14px}
+    .room-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .room-label-wrap{display:flex;align-items:center;gap:6px}
+    .room-label{font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.5px}
+    .room-tools{display:flex;gap:5px}
+    .bed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px}
+    .bed-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:11px;transition:all 0.15s}
+    .bed-card.occupied{background:#f0faf5;border-color:#a7e8cc;border-left:3px solid var(--green-mid)}
+    .bed-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-3)}
+    .bed-name{font-size:13px;font-weight:600;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bed-rent{font-size:11px;color:var(--green-mid);font-weight:600}
+    .bed-vacant{font-size:12px;color:var(--ink-3);margin:4px 0 7px;font-style:italic}
+    .bed-actions{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+
+    /* ── BUTTONS ── */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:40px;border:none;font-weight:600;font-size:13px;cursor:pointer;transition:all 0.15s;font-family:inherit;white-space:nowrap;min-height:38px}
+    .btn svg{width:14px;height:14px;flex-shrink:0}
+    .btn-primary{background:var(--green-deep);color:white}
+    .btn-primary:active{background:#0a3d2e;transform:scale(0.98)}
+    .btn-ghost{background:transparent;color:var(--ink-2);border:1px solid var(--border)}
+    .btn-ghost:active{background:var(--surface)}
+    .btn-danger{background:var(--red-bg);color:var(--red);border:1px solid #fca5a5}
+    .btn-sm{padding:6px 12px;font-size:12px;min-height:30px}
+    .btn-xs{padding:4px 9px;font-size:11px;min-height:26px}
+    .btn-w{width:100%}
+    .btn-icon{padding:6px;border-radius:var(--r-sm);background:transparent;border:1px solid var(--border);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;color:var(--ink-2)}
+    .btn-icon svg{width:14px;height:14px}
+    .btn-icon:hover{background:var(--surface)}
+
+    /* ── BADGES ── */
+    .badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap}
+    .badge-green{background:#dcfce7;color:#15803d}
+    .badge-amber{background:var(--amber-bg);color:var(--amber)}
+    .badge-red{background:var(--red-bg);color:var(--red)}
+    .badge-blue{background:var(--blue-bg);color:var(--blue)}
+    .badge-purple{background:var(--purple-bg);color:var(--purple)}
+    .badge-gray{background:#f3f4f6;color:#4b5563}
+
+    /* ── FORMS ── */
+    .form-group{margin-bottom:13px}
+    label.field-label{display:block;font-size:11px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:5px}
+    input[type=text],input[type=number],input[type=date],input[type=tel],input[type=password],select,textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:inherit;background:var(--card);color:var(--ink);-webkit-appearance:none;appearance:none;transition:border-color 0.15s}
+    select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7877' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+    textarea{resize:vertical;min-height:72px}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-mid);box-shadow:0 0 0 3px rgba(26,122,92,0.1)}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+    /* ── MODAL ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;z-index:200}
+    .modal-overlay.open{display:flex}
+    .modal-box{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;padding:6px 20px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -8px 32px rgba(0,0,0,0.2);animation:slideUp 0.25s ease}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    .sheet-handle{width:38px;height:4px;background:var(--border-strong);border-radius:2px;margin:10px auto 14px}
+    .modal-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+    .modal-actions{display:flex;gap:8px;margin-top:14px}
+
+    /* ── TENANT LIST ── */
+    .tenant-row{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 13px;margin-bottom:7px;display:flex;align-items:center;gap:11px;box-shadow:var(--shadow);cursor:pointer;transition:border-color 0.15s}
+    .tenant-row:hover{border-color:var(--border-strong)}
+    .tenant-avatar{width:38px;height:38px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--green-mid);flex-shrink:0}
+    .tenant-info{flex:1;min-width:0}
+    .tenant-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tenant-meta{font-size:11px;color:var(--ink-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tenant-right{text-align:right;flex-shrink:0}
+
+    /* ── PAYMENT ROWS ── */
+    .payment-group{margin-bottom:10px}
+    .payment-group-header{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--surface);border-radius:var(--r-sm);cursor:pointer;user-select:none;border:1px solid var(--border)}
+    .payment-group-title{font-weight:600;font-size:13px}
+    .payment-group-total{font-size:11px;color:var(--ink-3);margin-top:1px}
+    .payment-list{display:none;background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r-sm) var(--r-sm)}
+    .payment-list.open{display:block}
+    .payment-entry{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;font-size:13px;border-bottom:1px solid var(--surface)}
+    .payment-entry:last-child{border-bottom:none}
+    .payment-entry-left{display:flex;flex-direction:column;gap:1px}
+    .payment-entry-date{color:var(--ink-3);font-size:11px}
+
+    /* ── SEARCH ── */
+    .search-wrap{position:relative;margin-bottom:12px}
+    .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-3);width:14px;height:14px;pointer-events:none}
+    .search-input{width:100%;padding:10px 12px 10px 34px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:inherit;background:var(--card);color:var(--ink);-webkit-appearance:none}
+    .search-input:focus{outline:none;border-color:var(--green-mid);box-shadow:0 0 0 3px rgba(26,122,92,0.1)}
+
+    /* ── ALERTS ── */
+    .alert{padding:11px 13px;border-radius:var(--r-sm);font-size:13px;display:flex;gap:9px;align-items:flex-start;margin-bottom:13px}
+    .alert-warning{background:var(--amber-bg);color:#92400e;border:1px solid #fcd34d}
+    .alert-success{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+    .alert svg{width:15px;height:15px;flex-shrink:0;margin-top:2px}
+
+    /* ── EMPTY STATE ── */
+    .empty{text-align:center;padding:36px 20px;color:var(--ink-3)}
+    .empty-icon{font-size:26px;margin-bottom:7px;opacity:0.35}
+    .empty-title{font-size:14px;font-weight:600;color:var(--ink-2);margin-bottom:2px}
+    .empty-sub{font-size:12px}
+
+    /* ── TOAST ── */
+    .toast{position:fixed;bottom:calc(var(--bottom-bar) + 14px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--green-deep);color:white;padding:10px 20px;border-radius:40px;font-size:13px;font-weight:500;z-index:2000;opacity:0;transition:all 0.3s;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.2);white-space:nowrap;max-width:90vw;text-align:center}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    /* ── FINANCE ── */
+    .finance-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+    .fin-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;box-shadow:var(--shadow)}
+    .fin-amount{font-size:17px;font-weight:700;letter-spacing:-0.4px;margin-bottom:2px}
+    .fin-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-3)}
+    .fin-card.primary{background:var(--green-deep);border-color:var(--green-deep)}
+    .fin-card.primary .fin-amount{color:#fff}
+    .fin-card.primary .fin-label{color:rgba(255,255,255,0.5)}
+    .fin-card.expense{background:var(--red-bg);border-color:#fca5a5}
+    .fin-card.expense .fin-amount{color:var(--red)}
+    .fin-card.profit{background:#f0fdf4;border-color:#86efac}
+    .fin-card.profit .fin-amount{color:#15803d}
+    .finance-layout{display:grid;grid-template-columns:1fr 1.7fr;gap:14px}
+
+    /* ── OCCUPANCY BAR ── */
+    .occupancy-bar{background:var(--border);border-radius:4px;height:5px;overflow:hidden;margin-top:4px}
+    .occupancy-fill{height:100%;border-radius:4px;background:var(--green-bright);transition:width 0.5s ease}
+
+    /* ── DANGER ZONE ── */
+    .danger-zone{background:var(--red-bg);border:1px solid #fca5a5;border-radius:var(--r-sm);padding:11px 13px;margin-bottom:11px;font-size:13px;color:#991b1b}
+
+    /* ── EXPENSE ROW ── */
+    .expense-row{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;font-size:13px;border-bottom:1px solid var(--surface)}
+    .expense-row:last-child{border-bottom:none}
+    .expense-cat{display:flex;align-items:center;gap:7px}
+    .expense-icon{width:28px;height:28px;border-radius:50%;background:var(--red-bg);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+
+    /* ── MAINTENANCE ── */
+    .maint-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:13px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
+    .maint-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px}
+    .maint-title{font-size:13px;font-weight:600}
+    .maint-meta{font-size:11px;color:var(--ink-3);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap}
+
+    /* ── NOTICES ── */
+    .notice-card{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--green-mid);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px}
+    .notice-title{font-size:13px;font-weight:600;margin-bottom:2px}
+    .notice-body{font-size:12px;color:var(--ink-2);line-height:1.5}
+    .notice-meta{font-size:10px;color:var(--ink-3);margin-top:5px;display:flex;justify-content:space-between;align-items:center}
+
+    /* ── PAYMENT PROOFS ── */
+    .proof-card{display:flex;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-bottom:8px}
+    .proof-thumb{width:64px;height:64px;border-radius:var(--r-sm);object-fit:cover;flex-shrink:0;cursor:pointer;background:var(--surface);border:1px solid var(--border)}
+    .proof-body{flex:1;min-width:0}
+    .proof-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+    .proof-amount{font-size:14px;font-weight:700}
+    .proof-meta{font-size:11px;color:var(--ink-3);margin-top:2px}
+    .proof-note{font-size:11.5px;color:var(--ink-2);margin-top:3px;font-style:italic}
+    .proof-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+    .lightbox-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:300;display:none;align-items:center;justify-content:center;padding:24px}
+    .lightbox-overlay.open{display:flex}
+    .lightbox-overlay img{max-width:100%;max-height:90vh;border-radius:var(--r-md);box-shadow:0 10px 40px rgba(0,0,0,0.5)}
+    .lightbox-close{position:absolute;top:18px;right:18px;background:rgba(255,255,255,0.15);color:white;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+
+    /* ── PIN LOCK ── */
+    #pin-screen{position:fixed;inset:0;background:var(--green-deep);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}
+    .pin-card{background:var(--card);border-radius:22px;padding:28px 24px;width:100%;max-width:340px;text-align:center}
+    .pin-logo{font-size:28px;margin-bottom:10px}
+    .pin-title{font-size:18px;font-weight:700;margin-bottom:4px}
+    .pin-sub{font-size:12px;color:var(--ink-3);margin-bottom:20px}
+    .pin-dots{display:flex;justify-content:center;gap:10px;margin-bottom:20px}
+    .pin-dot{width:14px;height:14px;border-radius:50%;background:var(--border);transition:background 0.15s}
+    .pin-dot.filled{background:var(--green-deep)}
+    .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .pin-key{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;font-size:18px;font-weight:600;cursor:pointer;transition:all 0.15s;user-select:none}
+    .pin-key:active{background:var(--green-deep);color:white;transform:scale(0.95)}
+    .pin-error{color:var(--red);font-size:12px;margin-top:8px;min-height:18px}
+    .pin-setup-note{font-size:11px;color:var(--ink-3);margin-top:10px;line-height:1.5}
+
+    /* ── CHART CONTAINER ── */
+    .chart-wrap{position:relative;height:200px;margin-top:4px}
+
+    /* ── TABS (sub-nav) ── */
+    .sub-tabs{display:flex;background:var(--surface);border-radius:var(--r-md);padding:3px;margin-bottom:14px;gap:2px}
+    .sub-tab{flex:1;padding:7px;text-align:center;font-size:12px;font-weight:600;color:var(--ink-3);cursor:pointer;border-radius:var(--r-sm);transition:all 0.15s;border:none;background:none;font-family:inherit}
+    .sub-tab.active{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+
+    /* ── RECEIPT ── */
+    .receipt-preview{background:var(--card);border:1.5px dashed var(--border-strong);border-radius:var(--r-lg);padding:20px;margin:12px 0}
+    .receipt-header{text-align:center;margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border)}
+    .receipt-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--ink-3)}
+    .receipt-row span:last-child{font-weight:600;color:var(--ink)}
+    .receipt-total{display:flex;justify-content:space-between;font-size:14px;font-weight:700;padding:10px 0 0;border-top:1px solid var(--border);margin-top:8px}
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:2px}
+
+    /* ════════ MOBILE ════════ */
+    @media(max-width:768px){
+      :root{--bottom-bar:60px}
+      .sidebar{transform:translateX(-100%)}
+      .sidebar.open{transform:translateX(0)}
+      .main{margin-left:0;padding-bottom:var(--bottom-bar)}
+      .bottom-nav{display:block}
+      .menu-btn{display:flex}
+      .topbar{padding:11px 15px}
+      .page-title{font-size:15px}
+      .content{padding:13px 13px}
+      .stats-row{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+      .stat-num{font-size:19px}
+      .dash-grid{grid-template-columns:1fr}
+      .house-block-header{flex-direction:column;align-items:flex-start}
+      .house-hdr-btns{display:flex;gap:6px;margin-top:7px}
+      .bed-grid{grid-template-columns:repeat(2,1fr);gap:7px}
+      .tenant-row{padding:10px 11px;gap:9px}
+      .finance-layout{grid-template-columns:1fr}
+      .finance-grid{grid-template-columns:repeat(2,1fr);gap:7px}
+      .fin-amount{font-size:15px}
+      .fin-label{font-size:9px}
+      .form-row{grid-template-columns:1fr}
+      .form-row-3{grid-template-columns:1fr}
+      .toast{bottom:calc(var(--bottom-bar) + 10px)}
+      .modal-box{border-radius:18px 18px 0 0;padding:0 15px calc(18px + env(safe-area-inset-bottom))}
+      .modal-actions{flex-direction:column}
+      .modal-actions .btn{width:100%}
+    }
+    @media(max-width:380px){
+      .stats-row{grid-template-columns:repeat(2,1fr)}
+      .bed-grid{grid-template-columns:1fr}
+      .finance-grid{grid-template-columns:1fr 1fr}
+    }
+
+    /* tiny extra for collapse icon */
+    .collapse-icon{transition:transform 0.3s ease;display:inline-block;margin-left:4px}
+    .collapse-icon.open{transform:rotate(180deg)}
+  </style>
+</head>
+<body>
+
+<!-- PIN LOCK -->
+<div id="pin-screen">
+  <div class="pin-card">
+    <div class="pin-logo">🔒</div>
+    <div class="pin-title" id="pin-title">Admin Access</div>
+    <div class="pin-sub" id="pin-sub">Enter your 4-digit PIN</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad">
+      <div class="pin-key" onclick="pinKey('1')">1</div>
+      <div class="pin-key" onclick="pinKey('2')">2</div>
+      <div class="pin-key" onclick="pinKey('3')">3</div>
+      <div class="pin-key" onclick="pinKey('4')">4</div>
+      <div class="pin-key" onclick="pinKey('5')">5</div>
+      <div class="pin-key" onclick="pinKey('6')">6</div>
+      <div class="pin-key" onclick="pinKey('7')">7</div>
+      <div class="pin-key" onclick="pinKey('8')">8</div>
+      <div class="pin-key" onclick="pinKey('9')">9</div>
+      <div class="pin-key" style="font-size:12px;color:var(--ink-3)" onclick="pinClear()">⌫</div>
+      <div class="pin-key" onclick="pinKey('0')">0</div>
+      <div class="pin-key" style="font-size:11px;color:var(--ink-3)" onclick="pinClear(true)">CLR</div>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-setup-note" id="pin-setup-note"></div>
+  </div>
+</div>
+
+<div class="app" id="main-app" style="display:none">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🏠</div>
+    <div class="brand-name">Lodge Manager</div>
+    <div class="brand-sub">v3 · Collapsible</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Main</div>
+    <div class="nav-item active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" data-page="houses">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      Houses
+    </div>
+    <div class="nav-item" data-page="tenants">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"/></svg>
+      Tenants
+    </div>
+    <div class="nav-section">Money</div>
+    <div class="nav-item" data-page="finance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6"/></svg>
+      Finance
+      <span class="nav-badge" id="finance-badge" style="display:none">0</span>
+    </div>
+    <div class="nav-item" data-page="expenses">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
+      Expenses
+    </div>
+    <div class="nav-section">Operations</div>
+    <div class="nav-item" data-page="maintenance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+      Maintenance
+      <span class="nav-badge" id="maint-badge" style="display:none">0</span>
+    </div>
+    <div class="nav-item" data-page="notices">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      Notices
+    </div>
+    <div class="nav-section">Settings</div>
+    <div class="nav-item" data-page="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Settings
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="version-badge">Lodge Manager v3.0</div>
+  </div>
+</aside>
+
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeSidebar()"></div>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="menu-btn" onclick="toggleSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="page-title" id="topbarTitle">Dashboard</div>
+    </div>
+    <div class="topbar-right" id="topbarActions"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <section class="page active" id="dashboard-page">
+      <div class="stats-row">
+        <div class="stat-chip accent">
+          <div class="stat-num" id="st-income">K0</div>
+          <div class="stat-lbl">Monthly Rent</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-num" id="st-netprofit">K0</div>
+          <div class="stat-lbl">Net Profit (30d)</div>
+          <div class="stat-delta" id="st-netdelta"></div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-num" id="st-tenants">0</div>
+          <div class="stat-lbl">Tenants</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-num" id="st-vacant">0</div>
+          <div class="stat-lbl">Vacant Beds</div>
+        </div>
+      </div>
+      <div id="dash-alerts"></div>
+      <div class="dash-grid">
+        <div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Occupancy by House</span></div>
+            <div id="occupancy-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Overdue Tenants</span></div>
+            <div id="overdue-list"></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Revenue — Last 6 Months</span></div>
+            <div class="chart-wrap"><canvas id="revenue-chart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Income vs Expenses (30d)</span></div>
+            <div class="chart-wrap"><canvas id="pie-chart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOUSES -->
+    <section class="page" id="houses-page">
+      <div id="houses-list"></div>
+    </section>
+
+    <!-- TENANTS -->
+    <section class="page" id="tenants-page">
+      <div class="card" style="background:var(--green-deep);border-color:var(--green-deep);margin-bottom:13px">
+        <div style="display:flex;justify-content:space-between;align-items:center;color:white">
+          <div><div style="font-size:20px;font-weight:700" id="t-count">0</div><div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.5px">Active Tenants</div></div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:700" id="t-monthly">K0</div><div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.5px">Monthly Rent</div></div>
+        </div>
+      </div>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-input" id="tenant-search" placeholder="Search by name or phone…" autocomplete="off">
+      </div>
+      <div id="tenants-list"></div>
+    </section>
+
+    <!-- FINANCE -->
+    <section class="page" id="finance-page">
+      <div class="card" id="proofs-card">
+        <div class="card-header">
+          <span class="card-title">Payment Proofs Awaiting Review</span>
+          <span class="nav-badge" id="proofs-badge" style="display:none;margin-left:0">0</span>
+        </div>
+        <div id="proofs-list"></div>
+      </div>
+      <div class="finance-grid">
+        <div class="fin-card primary">
+          <div class="fin-amount" id="fin-total">K0</div>
+          <div class="fin-label">All-Time Collected</div>
+        </div>
+        <div class="fin-card">
+          <div class="fin-amount" id="fin-30">K0</div>
+          <div class="fin-label">Last 30 Days Income</div>
+        </div>
+        <div class="fin-card expense">
+          <div class="fin-amount" id="fin-exp30">K0</div>
+          <div class="fin-label">Last 30 Days Expenses</div>
+        </div>
+        <div class="fin-card profit">
+          <div class="fin-amount" id="fin-net30">K0</div>
+          <div class="fin-label">Net Profit (30d)</div>
+        </div>
+      </div>
+      <div class="finance-layout">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:13px">Record Payment</div>
+          <div class="form-group">
+            <label class="field-label">Tenant</label>
+            <select id="pay-tenant" onchange="autoFillAmt()"></select>
+          </div>
+          <div class="form-group">
+            <label class="field-label">Amount (K)</label>
+            <input type="number" id="pay-amount" step="0.01" placeholder="0.00" inputmode="decimal">
+          </div>
+          <div class="form-group">
+            <label class="field-label">Payment Date</label>
+            <input type="date" id="pay-date">
+          </div>
+          <div class="form-group">
+            <label class="field-label">Note (optional)</label>
+            <input type="text" id="pay-note" placeholder="e.g. Cash, mobile money…">
+          </div>
+          <button class="btn btn-primary btn-w" onclick="logPayment()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Post Payment
+          </button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Financial Statement</span>
+            <button class="btn btn-ghost btn-sm" onclick="exportCSV()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="search-input" id="finance-search" placeholder="Filter by name…" autocomplete="off">
+          </div>
+          <div id="finance-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EXPENSES -->
+    <section class="page" id="expenses-page">
+      <div class="finance-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="fin-card primary">
+          <div class="fin-amount" id="exp-total">K0</div>
+          <div class="fin-label">All-Time Expenses</div>
+        </div>
+        <div class="fin-card expense">
+          <div class="fin-amount" id="exp-30">K0</div>
+          <div class="fin-label">Last 30 Days</div>
+        </div>
+        <div class="fin-card">
+          <div class="fin-amount" id="exp-count">0</div>
+          <div class="fin-label">Total Records</div>
+        </div>
+      </div>
+      <div class="finance-layout">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:13px">Add Expense</div>
+          <div class="form-group">
+            <label class="field-label">Category</label>
+            <select id="exp-cat">
+              <option>Utilities (Water)</option>
+              <option>Utilities (Electricity)</option>
+              <option>Maintenance / Repairs</option>
+              <option>Caretaker / Staff</option>
+              <option>Insurance</option>
+              <option>Security</option>
+              <option>Rates / Council</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="field-label">Amount (K)</label>
+            <input type="number" id="exp-amount" step="0.01" placeholder="0.00" inputmode="decimal">
+          </div>
+          <div class="form-group">
+            <label class="field-label">Date</label>
+            <input type="date" id="exp-date">
+          </div>
+          <div class="form-group">
+            <label class="field-label">House (optional)</label>
+            <select id="exp-house"></select>
+          </div>
+          <div class="form-group">
+            <label class="field-label">Description</label>
+            <input type="text" id="exp-desc" placeholder="Brief description…">
+          </div>
+          <button class="btn btn-primary btn-w" onclick="addExpense()">Add Expense</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Expense Records</span>
+          </div>
+          <div id="expense-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAINTENANCE -->
+    <section class="page" id="maintenance-page">
+      <div id="maint-list-admin"></div>
+    </section>
+
+    <!-- NOTICES -->
+    <section class="page" id="notices-page">
+      <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:14px">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:13px">Post a Notice</div>
+          <div class="form-group">
+            <label class="field-label">Title</label>
+            <input type="text" id="notice-title" placeholder="e.g. Water shutdown Saturday">
+          </div>
+          <div class="form-group">
+            <label class="field-label">Message</label>
+            <textarea id="notice-body" placeholder="Write your message to all tenants…"></textarea>
+          </div>
+          <button class="btn btn-primary btn-w" onclick="postNotice()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+            Post Notice
+          </button>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Posted Notices</span></div>
+          <div id="notices-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="settings-page">
+      <div style="max-width:540px">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:13px">Change Admin PIN</div>
+          <div class="form-group">
+            <label class="field-label">Current PIN</label>
+            <input type="password" id="pin-current" placeholder="••••" maxlength="4" inputmode="numeric">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="field-label">New PIN</label>
+              <input type="password" id="pin-new" placeholder="••••" maxlength="4" inputmode="numeric">
+            </div>
+            <div class="form-group">
+              <label class="field-label">Confirm PIN</label>
+              <input type="password" id="pin-confirm" placeholder="••••" maxlength="4" inputmode="numeric">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="changePIN()">Update PIN</button>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:13px">Data Backup & Restore</div>
+          <p style="font-size:13px;color:var(--ink-3);margin-bottom:13px">Export all your data as a JSON backup file. You can import it later to restore everything — houses, tenants, payments, and expenses.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost" onclick="exportBackup()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export Backup
+            </button>
+            <label class="btn btn-ghost" style="cursor:pointer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Import Backup
+              <input type="file" id="import-file" accept=".json" style="display:none" onchange="importBackup(event)">
+            </label>
+          </div>
+        </div>
+        <div class="card" style="border-color:#fca5a5">
+          <div class="card-title" style="margin-bottom:4px;color:var(--red)">Danger Zone</div>
+          <p style="font-size:13px;color:var(--ink-3);margin-bottom:13px">Permanently wipe all data from this device. This cannot be undone.</p>
+          <button class="btn btn-danger" onclick="nukeData()">Erase All Data</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- BOTTOM NAV (mobile) -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <button class="bnav-item active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Home
+    </button>
+    <button class="bnav-item" data-page="houses">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      Houses
+    </button>
+    <button class="bnav-item" data-page="tenants">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Tenants
+    </button>
+    <button class="bnav-item" data-page="finance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6"/></svg>
+      Finance
+      <div class="bnav-dot" id="bnav-finance-dot"></div>
+    </button>
+    <button class="bnav-item" data-page="maintenance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+      Repairs
+      <div class="bnav-dot" id="bnav-maint-dot"></div>
+    </button>
+  </div>
+</nav>
+</div>
+
+<!-- MODALS (same as before, concise) -->
+<div class="modal-overlay" id="modal-house"><div class="modal-box"><div class="sheet-handle"></div><div class="modal-title"><span id="house-modal-title">Add House</span></div><input type="hidden" id="edit-house-id"><div class="form-group"><label class="field-label">House Name</label><input type="text" id="h-name" placeholder="Garden View Lodge"></div><div class="form-group"><label class="field-label">Address</label><input type="text" id="h-addr" placeholder="Plot 7, Freedom Way, Lusaka"></div><div class="form-row" id="new-house-fields"><div class="form-group"><label class="field-label">Number of Rooms</label><input type="number" id="h-rooms" value="2" min="1" inputmode="numeric"></div><div class="form-group"><label class="field-label">Beds per Room</label><input type="number" id="h-beds" value="3" min="1" inputmode="numeric"></div></div><div class="modal-actions"><button class="btn btn-primary" onclick="saveHouse()">Save House</button><button class="btn btn-ghost" onclick="closeModals()">Cancel</button></div></div></div>
+<div class="modal-overlay" id="modal-rename-room"><div class="modal-box"><div class="sheet-handle"></div><div class="modal-title">Rename Room</div><input type="hidden" id="rename-room-id"><div class="form-group"><label class="field-label">Room Name</label><input type="text" id="rename-room-val" placeholder="e.g. Master Bedroom"></div><div class="modal-actions"><button class="btn btn-primary" onclick="saveRoomName()">Save Name</button><button class="btn btn-ghost" onclick="closeModals()">Cancel</button></div></div></div>
+<div class="modal-overlay" id="modal-tenant"><div class="modal-box"><div class="sheet-handle"></div><div class="modal-title"><span id="tenant-modal-title">Assign Tenant</span></div><input type="hidden" id="edit-bed-id"><div class="form-row"><div class="form-group"><label class="field-label">Full Name</label><input type="text" id="t-name" placeholder="Grace Banda"></div><div class="form-group"><label class="field-label">Phone Number</label><input type="tel" id="t-phone" placeholder="+260 966 000000" inputmode="tel"></div></div><div class="form-row"><div class="form-group"><label class="field-label">Monthly Rent (K)</label><input type="number" id="t-rent" value="1200" step="0.01" inputmode="decimal"></div><div class="form-group"><label class="field-label">Due Day (1–28)</label><input type="number" id="t-dueday" value="1" min="1" max="28" inputmode="numeric"></div></div><div class="form-row"><div class="form-group"><label class="field-label">Lease Start</label><input type="date" id="t-lease"></div><div class="form-group"><label class="field-label">Portal PIN (optional)</label><input type="text" id="t-portalpin" placeholder="Auto: last 4 of phone" maxlength="6" inputmode="numeric"></div></div><div class="form-group"><label class="field-label">Notes (NRC, emergency contact, etc.)</label><textarea id="t-notes" placeholder="Optional notes about this tenant…"></textarea></div><div class="modal-actions"><button class="btn btn-primary" onclick="saveTenant()">Save Tenant</button><button class="btn btn-ghost" onclick="closeModals()">Cancel</button></div></div></div>
+<div class="modal-overlay" id="modal-vacate"><div class="modal-box"><div class="sheet-handle"></div><div class="modal-title" style="color:var(--red)">Vacate Bed</div><div class="danger-zone" id="vacate-msg">Are you sure?</div><p style="font-size:12px;color:var(--ink-3);margin-bottom:14px">The tenant record and all payment history for this tenant will be permanently removed.</p><input type="hidden" id="vacate-bed-id"><div class="modal-actions"><button class="btn btn-danger" onclick="confirmVacate()">Yes, Vacate Bed</button><button class="btn btn-ghost" onclick="closeModals()">Cancel</button></div></div></div>
+<div class="modal-overlay" id="modal-delete-house"><div class="modal-box"><div class="sheet-handle"></div><div class="modal-title" style="color:var(--red)">Delete House</div><div class="danger-zone" id="delete-house-msg">Are you sure?</div><p style="font-size:12px;color:var(--ink-3);margin-bottom:14px">All rooms, beds, tenants and payment history will be permanently removed.</p><input type="hidden" id="delete-house-id"><div class="modal-actions"><button class="btn btn-danger" onclick="confirmDeleteHouse()">Delete Everything</button><button class="btn btn-ghost" onclick="closeModals()">Cancel</button></div></div></div>
+<div class="modal-overlay" id="modal-receipt"><div class="modal-box"><div class="sheet-handle"></div><div class="modal-title">Payment Receipt</div><div id="receipt-body"></div><div class="modal-actions"><button class="btn btn-primary" onclick="window.print()">Print Receipt</button><button class="btn btn-ghost" onclick="closeModals()">Close</button></div></div></div>
+<div class="modal-overlay" id="modal-delete-pay"><div class="modal-box"><div class="sheet-handle"></div><div class="modal-title" style="color:var(--red)">Delete Payment</div><div class="danger-zone" id="delete-pay-msg">Delete this payment record?</div><input type="hidden" id="delete-pay-id"><div class="modal-actions"><button class="btn btn-danger" onclick="confirmDeletePayment()">Yes, Delete</button><button class="btn btn-ghost" onclick="closeModals()">Cancel</button></div></div></div>
+<div class="modal-overlay" id="modal-reject-proof"><div class="modal-box"><div class="sheet-handle"></div><div class="modal-title">Reject Payment Proof</div><div class="form-group"><label class="field-label">Reason (shown to tenant)</label><textarea id="reject-reason-input" placeholder="e.g. Screenshot is unclear, amount doesn't match, wrong date…"></textarea></div><input type="hidden" id="reject-proof-id"><div class="modal-actions"><button class="btn btn-danger" onclick="confirmRejectProof()">Reject Proof</button><button class="btn btn-ghost" onclick="closeModals()">Cancel</button></div></div></div>
+<div class="lightbox-overlay" id="lightbox-overlay" onclick="closeLightbox()"><button class="lightbox-close" onclick="closeLightbox()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><img id="lightbox-img" src="" alt="Payment screenshot" onclick="event.stopPropagation()"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════
+   DATA LAYER (unchanged)
+══════════════════════════════════════════ */
+const STORE_KEY='lodge_mgr_v5';
+const CLIENT_KEY='lodge_client_v1';
+let db={houses:[],rooms:[],beds:[],tenants:[],payments:[],expenses:[]};
+let clientData={maintenanceRequests:[],notices:[],paymentProofs:[]};
+
+const genId=()=>Date.now()+'-'+Math.random().toString(36).substr(2,8);
+const esc=s=>s?String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])):'';
+const fmt=n=>'K'+Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+const initials=name=>name.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+function loadDB(){
+  const raw=localStorage.getItem(STORE_KEY);
+  if(raw){ db=JSON.parse(raw); if(!db.expenses) db.expenses=[]; }
+  else seedDemo();
+  const raw2=localStorage.getItem(CLIENT_KEY);
+  if(raw2) clientData=JSON.parse(raw2);
+  if(!clientData.maintenanceRequests) clientData.maintenanceRequests=[];
+  if(!clientData.notices) clientData.notices=[];
+  if(!clientData.paymentProofs) clientData.paymentProofs=[];
+}
+function saveDB(){localStorage.setItem(STORE_KEY,JSON.stringify(db));}
+function saveClientDB(){localStorage.setItem(CLIENT_KEY,JSON.stringify(clientData));}
+
+function seedDemo(){
+  const hid=genId();
+  db.houses=[{id:hid,name:'Green Valley Lodge',addr:'Plot 7, Freedom Way, Lusaka'}];
+  ['Room 1','Room 2','Room 3'].forEach(rname=>{
+    const rid=genId(); db.rooms.push({id:rid,houseId:hid,name:rname});
+    ['Bed A','Bed B','Bed C'].forEach(bl=>db.beds.push({id:genId(),roomId:rid,houseId:hid,label:bl,tenantId:null}));
+  });
+  const t1=genId(),t2=genId(),t3=genId();
+  db.beds[0].tenantId=t1; db.beds[1].tenantId=t2; db.beds[3].tenantId=t3;
+  db.tenants=[
+    {id:t1,bedId:db.beds[0].id,name:'Grace Banda',phone:'+260 966 123456',rent:1350,dueDay:5,leaseStart:'2025-02-01',notes:''},
+    {id:t2,bedId:db.beds[1].id,name:'Michael Zulu',phone:'+260 977 654321',rent:1500,dueDay:10,leaseStart:'2025-01-15',notes:'Emergency: +260 211 000000'},
+    {id:t3,bedId:db.beds[3].id,name:'Faith Mwale',phone:'+260 955 112233',rent:1200,dueDay:1,leaseStart:'2025-03-01',notes:''}
+  ];
+  for(let i=5;i>=0;i--){ const d=new Date(); d.setMonth(d.getMonth()-i); d.setDate(5); db.payments.push({id:genId(),tenantId:t1,amount:1350,date:d.toISOString().slice(0,10),ts:d.getTime(),note:'Cash'});}
+  for(let i=5;i>=1;i--){ const d=new Date(); d.setMonth(d.getMonth()-i); d.setDate(10); db.payments.push({id:genId(),tenantId:t2,amount:1500,date:d.toISOString().slice(0,10),ts:d.getTime(),note:''});}
+  for(let i=5;i>=0;i--){ const d=new Date(); d.setMonth(d.getMonth()-i); d.setDate(15); db.expenses.push({id:genId(),category:'Utilities (Electricity)',amount:320,date:d.toISOString().slice(0,10),houseId:hid,desc:'ZESCO bill'}); db.expenses.push({id:genId(),category:'Utilities (Water)',amount:85,date:d.toISOString().slice(0,10),houseId:hid,desc:'LWSC bill'});}
+  db.expenses.push({id:genId(),category:'Maintenance / Repairs',amount:650,date:new Date().toISOString().slice(0,10),houseId:hid,desc:'Replaced burst geyser'});
+  clientData.maintenanceRequests=[{id:genId(),tenantId:t1,title:'Leaking tap in bathroom',category:'Plumbing',desc:'The cold tap in Room 1 bathroom drips constantly.',urgency:'medium',status:'open',date:new Date().toISOString().slice(0,10)}];
+  saveDB(); saveClientDB();
+}
+
+/* ── PIN (unchanged) ── */
+let pinBuffer=''; const DEFAULT_PIN='1234';
+function getPIN(){return localStorage.getItem('lodge_admin_pin')||DEFAULT_PIN;}
+function pinKey(d){ if(pinBuffer.length>=4) return; pinBuffer+=d; updatePinDots(); if(pinBuffer.length===4) setTimeout(checkPin,150);}
+function pinClear(all=false){ pinBuffer=all?'':pinBuffer.slice(0,-1); updatePinDots(); document.getElementById('pin-error').textContent='';}
+function updatePinDots(){ for(let i=0;i<4;i++) document.getElementById('pd'+i).classList.toggle('filled',i<pinBuffer.length);}
+function checkPin(){ const stored=getPIN(); if(pinBuffer===stored){ document.getElementById('pin-screen').style.display='none'; document.getElementById('main-app').style.display='flex'; renderAll(); } else { document.getElementById('pin-error').textContent='Incorrect PIN. Try again.'; pinBuffer=''; updatePinDots(); }}
+function changePIN(){ const cur=document.getElementById('pin-current').value, nw=document.getElementById('pin-new').value, cf=document.getElementById('pin-confirm').value; if(cur!==getPIN()){toast('Current PIN is incorrect',true);return;} if(nw.length!==4||!/^\d{4}$/.test(nw)){toast('New PIN must be 4 digits',true);return;} if(nw!==cf){toast('PINs do not match',true);return;} localStorage.setItem('lodge_admin_pin',nw); document.getElementById('pin-current').value=''; document.getElementById('pin-new').value=''; document.getElementById('pin-confirm').value=''; toast('PIN updated successfully');}
+(function(){ if(!localStorage.getItem('lodge_admin_pin')) document.getElementById('pin-setup-note').textContent='Default PIN is 1234. Change it in Settings after login.'; })();
+
+/* ── DUE DATE ── */
+function getNextDue(t){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dd=Math.min(t.dueDay||1,28);
+  const last=db.payments.filter(p=>p.tenantId===t.id).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+  if(!last){ const start=t.leaseStart?new Date(t.leaseStart):new Date(today.getFullYear(),today.getMonth(),1); let d=new Date(start.getFullYear(),start.getMonth(),dd); if(d<=today) d=new Date(start.getFullYear(),start.getMonth()+1,dd); return d; }
+  const ld=new Date(last.date); return new Date(ld.getFullYear(),ld.getMonth()+1,dd);
+}
+function daysUntil(t){ const next=getNextDue(t), today=new Date(); today.setHours(0,0,0,0); return Math.ceil((next-today)/(1000*60*60*24));}
+function isOverdue(t){return daysUntil(t)<0;}
+function dueText(t){ const d=daysUntil(t); if(d<0) return{label:`${Math.abs(d)}d overdue`,cls:'badge-red'}; if(d===0) return{label:'Due today',cls:'badge-amber'}; if(d<=7) return{label:`${d}d left`,cls:'badge-amber'}; return{label:`${d}d left`,cls:'badge-green'};}
+
+/* ── NAVIGATION ── */
+function showPage(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item,.bnav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById(`${page}-page`).classList.add('active');
+  document.querySelectorAll(`[data-page="${page}"]`).forEach(n=>n.classList.add('active'));
+  const titles={dashboard:'Dashboard',houses:'Houses',tenants:'Tenants',finance:'Finance',expenses:'Expenses',maintenance:'Maintenance',notices:'Notices',settings:'Settings'};
+  document.getElementById('topbarTitle').textContent=titles[page]||page;
+  updateTopbarActions(page);
+  closeSidebar();
+  const renders={dashboard:renderDashboard,houses:renderHouses,tenants:renderTenants,finance:renderFinance,expenses:renderExpenses,maintenance:renderMaintenance,notices:renderNotices,settings:()=>{}};
+  if(renders[page]) renders[page]();
+}
+document.querySelectorAll('.nav-item,.bnav-item').forEach(item=>{ item.addEventListener('click',()=>{if(item.dataset.page) showPage(item.dataset.page);}); });
+function updateTopbarActions(page){ const el=document.getElementById('topbarActions'); if(page==='houses') el.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openHouseModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add House</button>`; else if(page==='settings') el.innerHTML=`<button class="btn btn-ghost btn-sm" onclick="doLock()">🔒 Lock</button>`; else el.innerHTML='';}
+function doLock(){ document.getElementById('main-app').style.display='none'; document.getElementById('pin-screen').style.display='flex'; pinBuffer=''; updatePinDots(); document.getElementById('pin-error').textContent='';}
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('drawer-overlay').classList.toggle('open');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('drawer-overlay').classList.remove('open');}
+
+/* ── CHARTS ── */
+let revenueChart=null, pieChart=null;
+function buildRevenueChart(){
+  const ctx=document.getElementById('revenue-chart'); if(!ctx) return;
+  const months=[], incomeData=[], expenseData=[];
+  for(let i=5;i>=0;i--){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-i); const y=d.getFullYear(), m=d.getMonth(); months.push(d.toLocaleString('default',{month:'short',year:'2-digit'})); incomeData.push(db.payments.filter(p=>{const pd=new Date(p.date);return pd.getFullYear()===y&&pd.getMonth()===m;}).reduce((s,p)=>s+p.amount,0)); expenseData.push(db.expenses.filter(e=>{const ed=new Date(e.date);return ed.getFullYear()===y&&ed.getMonth()===m;}).reduce((s,e)=>s+e.amount,0));}
+  if(revenueChart) revenueChart.destroy();
+  revenueChart=new Chart(ctx,{type:'bar',data:{labels:months,datasets:[{label:'Income',data:incomeData,backgroundColor:'rgba(26,122,92,0.8)',borderRadius:4,borderSkipped:false},{label:'Expenses',data:expenseData,backgroundColor:'rgba(220,38,38,0.55)',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:10},callback:v=>'K'+v.toLocaleString()}}}}});
+}
+function buildPieChart(){
+  const ctx=document.getElementById('pie-chart'); if(!ctx) return;
+  const t30=new Date(); t30.setDate(t30.getDate()-30);
+  const income30=db.payments.filter(p=>new Date(p.date)>=t30).reduce((s,p)=>s+p.amount,0);
+  const exp30=db.expenses.filter(e=>new Date(e.date)>=t30).reduce((s,e)=>s+e.amount,0);
+  const net=income30-exp30;
+  if(pieChart) pieChart.destroy();
+  pieChart=new Chart(ctx,{type:'doughnut',data:{labels:['Expenses','Net Profit'],datasets:[{data:[exp30,Math.max(0,net)],backgroundColor:['rgba(220,38,38,0.7)','rgba(26,122,92,0.8)'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},cutout:'65%'}});
+}
+
+/* ── DASHBOARD ── */
+function renderDashboard(){
+  const occ=db.beds.filter(b=>b.tenantId).length, vacant=db.beds.length-occ, monthly=db.tenants.reduce((s,t)=>s+(t.rent||0),0);
+  const t30=new Date(); t30.setDate(t30.getDate()-30);
+  const inc30=db.payments.filter(p=>new Date(p.date)>=t30).reduce((s,p)=>s+p.amount,0);
+  const exp30=db.expenses.filter(e=>new Date(e.date)>=t30).reduce((s,e)=>s+e.amount,0);
+  const net30=inc30-exp30;
+  document.getElementById('st-income').textContent=fmt(monthly);
+  document.getElementById('st-netprofit').textContent=fmt(net30);
+  document.getElementById('st-tenants').textContent=db.tenants.length;
+  document.getElementById('st-vacant').textContent=vacant;
+  const nd=document.getElementById('st-netdelta'); nd.textContent=net30>=0?'▲ Profitable':'▼ At a loss'; nd.className='stat-delta '+(net30>=0?'up':'down');
+  const ov=db.tenants.filter(t=>isOverdue(t));
+  const openMaint=clientData.maintenanceRequests.filter(r=>r.status==='open').length;
+  let alerts='';
+  if(ov.length>0) alerts+=`<div class="alert alert-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div><strong>${ov.length} tenant${ov.length>1?'s':''} overdue:</strong> ${ov.map(t=>`${esc(t.name)} (${Math.abs(daysUntil(t))}d)`).join(', ')}</div></div>`;
+  else alerts+=`<div class="alert alert-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><div>All tenants are up to date on rent.</div></div>`;
+  if(openMaint>0) alerts+=`<div class="alert alert-warning" style="cursor:pointer" onclick="showPage('maintenance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg><div><strong>${openMaint} open maintenance request${openMaint>1?'s':''}.</strong> Tap to review →</div></div>`;
+  document.getElementById('dash-alerts').innerHTML=alerts;
+  document.getElementById('occupancy-list').innerHTML=db.houses.length===0?`<div class="empty-sub">No houses added yet</div>`:db.houses.map(h=>{const hb=db.beds.filter(b=>b.houseId===h.id), o=hb.filter(b=>b.tenantId).length, pct=hb.length?Math.round((o/hb.length)*100):0; return`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:13px;font-weight:600">${esc(h.name)}</span><span style="font-size:11px;color:var(--ink-3)">${o}/${hb.length} • ${pct}%</span></div><div class="occupancy-bar"><div class="occupancy-fill" style="width:${pct}%"></div></div></div>`;}).join('');
+  document.getElementById('overdue-list').innerHTML=ov.length===0?`<div style="font-size:13px;color:var(--ink-3)">No overdue tenants — great!</div>`:ov.slice(0,5).map(t=>`<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="tenant-avatar" style="width:32px;height:32px;font-size:11px">${initials(t.name)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name)}</div><div style="font-size:11px;color:var(--ink-3)">${fmt(t.rent)}/mo</div></div><span class="badge badge-red">${Math.abs(daysUntil(t))}d</span></div>`).join('');
+  updateMaintBadge(); updateFinanceBadge();
+  setTimeout(()=>{buildRevenueChart();buildPieChart();},50);
+}
+function updateMaintBadge(){ const n=clientData.maintenanceRequests.filter(r=>r.status==='open').length; const badge=document.getElementById('maint-badge'); const dot=document.getElementById('bnav-maint-dot'); if(badge){badge.textContent=n;badge.style.display=n>0?'':'none';} if(dot) dot.classList.toggle('show',n>0);}
+
+/* ── HOUSES (collapsible) ── */
+function renderHouses(){
+  const el=document.getElementById('houses-list');
+  if(db.houses.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">🏚️</div><div class="empty-title">No houses yet</div><div class="empty-sub">Tap "Add House" to get started</div></div>`;return;}
+  el.innerHTML=db.houses.map(house=>{
+    const hRooms=db.rooms.filter(r=>r.houseId===house.id);
+    const hBeds=db.beds.filter(b=>b.houseId===house.id);
+    const occ=hBeds.filter(b=>b.tenantId).length;
+    const openState = window._houseCollapseState && window._houseCollapseState[house.id] ? 'open' : '';
+    const iconRot = openState ? 'open' : '';
+    return`<div class="house-block">
+      <div class="house-block-header" onclick="toggleHouse('${house.id}')">
+        <div>
+          <div class="house-block-name">${esc(house.name)} <span class="collapse-icon ${iconRot}">▼</span></div>
+          <div class="house-block-meta">📍 ${esc(house.addr)||'Address not set'} &nbsp;•&nbsp; ${occ}/${hBeds.length} beds occupied</div>
+        </div>
+        <div class="house-hdr-btns">
+          <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.2)" onclick="event.stopPropagation();openHouseModal('${house.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" style="background:rgba(220,38,38,0.18);color:#fca5a5;border:1px solid rgba(220,38,38,0.3)" onclick="event.stopPropagation();deleteHouse('${house.id}')">Delete</button>
+        </div>
+      </div>
+      <div class="house-block-body ${openState}" id="house-body-${house.id}">
+        <div class="house-block-body-inner">
+          ${hRooms.map(room=>{
+            const rBeds=db.beds.filter(b=>b.roomId===room.id);
+            const rOcc=rBeds.filter(b=>b.tenantId).length;
+            return`<div class="room-section">
+              <div class="room-header">
+                <div class="room-label-wrap">
+                  <span class="room-label">${esc(room.name)} — ${rOcc}/${rBeds.length}</span>
+                  <button class="btn-icon" onclick="openRenameRoom('${room.id}','${esc(room.name)}')" title="Rename room" style="min-width:22px;min-height:22px;padding:3px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                </div>
+                <div class="room-tools">
+                  <button class="btn-icon" onclick="addBed('${room.id}','${house.id}')" title="Add bed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+                  <button class="btn-icon" onclick="removeBed('${room.id}')" title="Remove last bed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+                </div>
+              </div>
+              <div class="bed-grid">
+                ${rBeds.map(bed=>{
+                  const tenant=bed.tenantId?db.tenants.find(t=>t.id===bed.tenantId):null;
+                  if(tenant){
+                    const due=dueText(tenant);
+                    return`<div class="bed-card occupied">
+                      <div class="bed-lbl">${esc(bed.label)}</div>
+                      <div class="bed-name">👤 ${esc(tenant.name)}</div>
+                      <div class="bed-rent">${fmt(tenant.rent)}/mo</div>
+                      <div style="margin-top:4px"><span class="badge ${due.cls}">${due.label}</span></div>
+                      <div class="bed-actions">
+                        <button class="btn btn-ghost btn-xs" onclick="openTenantModal('${bed.id}')">Edit</button>
+                        <button class="btn btn-danger btn-xs" onclick="openVacateModal('${bed.id}')">Vacate</button>
+                      </div>
+                    </div>`;
+                  }
+                  return`<div class="bed-card">
+                    <div class="bed-lbl">${esc(bed.label)}</div>
+                    <div class="bed-vacant">Vacant</div>
+                    <button class="btn btn-primary btn-xs" onclick="openTenantModal('${bed.id}')">Assign</button>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* toggle house collapse */
+function toggleHouse(houseId){
+  const body = document.getElementById('house-body-'+houseId);
+  if(!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open');
+  // update collapse icon
+  const header = body.closest('.house-block').querySelector('.house-block-header');
+  const icon = header.querySelector('.collapse-icon');
+  if(icon) icon.classList.toggle('open', !isOpen);
+  // store state
+  if(!window._houseCollapseState) window._houseCollapseState={};
+  window._houseCollapseState[houseId] = !isOpen;
+}
+
+/* ── TENANTS ── */
+function renderTenants(){
+  const total=db.tenants.reduce((s,t)=>s+(t.rent||0),0);
+  document.getElementById('t-count').textContent=db.tenants.length;
+  document.getElementById('t-monthly').textContent=fmt(total);
+  const q=(document.getElementById('tenant-search')?.value||'').toLowerCase();
+  const filtered=db.tenants.filter(t=>t.name.toLowerCase().includes(q)||(t.phone&&t.phone.includes(q)));
+  const el=document.getElementById('tenants-list');
+  if(filtered.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">No tenants found</div><div class="empty-sub">Try a different search</div></div>`;return;}
+  el.innerHTML=filtered.map(t=>{
+    const bed=db.beds.find(b=>b.id===t.bedId);
+    const room=bed?db.rooms.find(r=>r.id===bed.roomId):null;
+    const house=room?db.houses.find(h=>h.id===room.houseId):null;
+    const due=dueText(t);
+    const last=db.payments.filter(p=>p.tenantId===t.id).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    return`<div class="tenant-row" onclick="openTenantModal('${bed?.id||''}')">
+      <div class="tenant-avatar">${initials(t.name)}</div>
+      <div class="tenant-info">
+        <div class="tenant-name">${esc(t.name)}</div>
+        <div class="tenant-meta">${t.phone?`📞 ${esc(t.phone)} &nbsp;•&nbsp; `:''}${house?`🏠 ${esc(house.name)} &nbsp;•&nbsp; `:''}💰 ${fmt(t.rent)}/mo</div>
+        ${last?`<div style="font-size:11px;color:var(--ink-3);margin-top:1px">Last paid: ${fmt(last.amount)} on ${last.date}</div>`:`<div style="font-size:11px;color:var(--amber);margin-top:1px">⚠ No payments yet</div>`}
+        ${t.notes?`<div style="font-size:11px;color:var(--blue);margin-top:1px">📝 ${esc(t.notes.substring(0,50))}${t.notes.length>50?'…':''}</div>`:''}
+      </div>
+      <div class="tenant-right"><span class="badge ${due.cls}">${due.label}</span><div style="font-size:10px;color:var(--ink-3);margin-top:3px">Since ${t.leaseStart||'—'}</div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ── FINANCE (unchanged) ── */
+function renderFinance(){
+  renderProofs();
+  const total=db.payments.reduce((s,p)=>s+p.amount,0);
+  const t30=new Date(); t30.setDate(t30.getDate()-30);
+  const inc30=db.payments.filter(p=>new Date(p.date)>=t30).reduce((s,p)=>s+p.amount,0);
+  const exp30=db.expenses.filter(e=>new Date(e.date)>=t30).reduce((s,e)=>s+e.amount,0);
+  document.getElementById('fin-total').textContent=fmt(total);
+  document.getElementById('fin-30').textContent=fmt(inc30);
+  document.getElementById('fin-exp30').textContent=fmt(exp30);
+  document.getElementById('fin-net30').textContent=fmt(inc30-exp30);
+  const sel=document.getElementById('pay-tenant');
+  if(sel){ const cur=sel.value; sel.innerHTML='<option value="">— Select tenant —</option>'+db.tenants.map(t=>`<option value="${t.id}">${esc(t.name)} (${fmt(t.rent)}/mo)</option>`).join(''); if(cur) sel.value=cur; }
+  const dateEl=document.getElementById('pay-date'); if(dateEl&&!dateEl.value) dateEl.value=new Date().toISOString().slice(0,10);
+  const q=(document.getElementById('finance-search')?.value||'').toLowerCase();
+  const map=new Map();
+  db.payments.forEach(p=>{ const ten=db.tenants.find(t=>t.id===p.tenantId); if(!ten) return; if(!map.has(ten.id)) map.set(ten.id,{tenant:ten,payments:[]}); map.get(ten.id).payments.push(p);});
+  let arr=Array.from(map.values()); if(q) arr=arr.filter(item=>item.tenant.name.toLowerCase().includes(q));
+  const el=document.getElementById('finance-list');
+  if(arr.length===0){el.innerHTML=`<div style="text-align:center;padding:24px;color:var(--ink-3);font-size:13px">No payment records found</div>`;return;}
+  el.innerHTML=arr.map(({tenant,payments})=>{ const sorted=payments.sort((a,b)=>new Date(b.date)-new Date(a.date)); const tenTotal=sorted.reduce((s,p)=>s+p.amount,0); const uid=`pg-${tenant.id}`; return`<div class="payment-group"><div class="payment-group-header" onclick="toggleGroup('${uid}')"><div><div class="payment-group-title">${esc(tenant.name)}</div><div class="payment-group-total">${sorted.length} payments &nbsp;•&nbsp; ${fmt(tenTotal)}</div></div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div><div class="payment-list" id="${uid}">${sorted.map(p=>`<div class="payment-entry"><div class="payment-entry-left"><span style="font-weight:600">${fmt(p.amount)}</span><span class="payment-entry-date">${p.date}${p.note?` • ${esc(p.note)}`:''}</span></div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-ghost btn-xs" onclick="showReceipt('${p.id}')">Receipt</button><button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5" onclick="deletePaymentModal('${p.id}')">Delete</button></div></div>`).join('')}</div></div>`;}).join('');
+}
+function toggleGroup(id){document.getElementById(id)?.classList.toggle('open');}
+function autoFillAmt(){ const id=document.getElementById('pay-tenant')?.value; const t=db.tenants.find(t=>t.id===id); if(t) document.getElementById('pay-amount').value=t.rent; }
+function logPayment(){ const tid=document.getElementById('pay-tenant').value, amt=parseFloat(document.getElementById('pay-amount').value), date=document.getElementById('pay-date').value, note=document.getElementById('pay-note').value.trim(); if(!tid){toast('Select a tenant',true);return;} if(isNaN(amt)||amt<=0){toast('Enter a valid amount',true);return;} if(!date){toast('Select a date',true);return;} const today=new Date().toISOString().slice(0,10); if(date>today){toast('Payment date cannot be in the future',true);return;} const dup=db.payments.find(p=>p.tenantId===tid&&p.date===date&&p.amount===amt); if(dup&&!confirm(`A payment of ${fmt(amt)} from this tenant on ${date} already exists. Post anyway?`)) return; db.payments.push({id:genId(),tenantId:tid,amount:amt,date,ts:Date.now(),note}); saveDB(); document.getElementById('pay-amount').value=''; document.getElementById('pay-note').value=''; renderFinance(); renderDashboard(); toast(`${fmt(amt)} recorded`); }
+function pendingProofs(){ return clientData.paymentProofs.filter(p=>p.status==='pending').sort((a,b)=>a.submittedAt-b.submittedAt); }
+function updateFinanceBadge(){ const n=pendingProofs().length; const badge=document.getElementById('finance-badge'); const proofsBadge=document.getElementById('proofs-badge'); const dot=document.getElementById('bnav-finance-dot'); if(badge){badge.textContent=n;badge.style.display=n>0?'':'none';} if(proofsBadge){proofsBadge.textContent=n;proofsBadge.style.display=n>0?'':'none';} if(dot) dot.classList.toggle('show',n>0);}
+function renderProofs(){ updateFinanceBadge(); const proofs=pendingProofs(); const el=document.getElementById('proofs-list'); const card=document.getElementById('proofs-card'); if(proofs.length===0){card.style.display='none'; return;} card.style.display=''; el.innerHTML=proofs.map(p=>{ const t=db.tenants.find(t=>t.id===p.tenantId); return`<div class="proof-card"><img class="proof-thumb" src="${p.imageData}" onclick="openLightbox('${p.imageData.replace(/'/g,"\\'")}')" alt="Payment screenshot"><div class="proof-body"><div class="proof-top"><div><div class="proof-amount">${fmt(p.amountClaimed)}</div><div class="proof-meta">👤 ${t?esc(t.name):'Unknown tenant'} &nbsp;•&nbsp; 📅 Claims paid ${esc(p.dateClaimed)}</div></div><span class="badge badge-amber">Pending</span></div>${p.note?`<div class="proof-note">"${esc(p.note)}"</div>`:''}<div class="proof-actions"><button class="btn btn-xs" style="background:#f0fdf4;color:#15803d;border:1px solid #86efac" onclick="approveProof('${p.id}')">✓ Approve</button><button class="btn btn-xs btn-danger" onclick="openRejectProofModal('${p.id}')">✕ Reject</button></div></div></div>`;}).join('');}
+function approveProof(id){ const proof=clientData.paymentProofs.find(p=>p.id===id); if(!proof) return; const t=db.tenants.find(t=>t.id===proof.tenantId); if(!confirm(`Approve ${fmt(proof.amountClaimed)} from ${t?t.name:'this tenant'} on ${proof.dateClaimed}? This will record it as a real payment.`)) return; const paymentId=genId(); db.payments.push({id:paymentId,tenantId:proof.tenantId,amount:proof.amountClaimed,date:proof.dateClaimed,ts:Date.now(),note:proof.note?`Tenant-submitted: ${proof.note}`:'Tenant-submitted payment proof'}); proof.status='approved'; proof.linkedPaymentId=paymentId; proof.reviewedAt=Date.now(); saveDB(); saveClientDB(); renderProofs(); renderFinance(); renderDashboard(); toast(`Approved — ${fmt(proof.amountClaimed)} recorded and due date updated`);}
+function openRejectProofModal(id){ document.getElementById('reject-proof-id').value=id; document.getElementById('reject-reason-input').value=''; document.getElementById('modal-reject-proof').classList.add('open');}
+function confirmRejectProof(){ const id=document.getElementById('reject-proof-id').value; const reason=document.getElementById('reject-reason-input').value.trim(); const proof=clientData.paymentProofs.find(p=>p.id===id); if(!proof) return; proof.status='rejected'; proof.rejectionReason=reason||'No reason given'; proof.reviewedAt=Date.now(); saveClientDB(); closeModals(); renderProofs(); toast('Proof rejected — tenant will see your reason');}
+function openLightbox(src){ document.getElementById('lightbox-img').src=src; document.getElementById('lightbox-overlay').classList.add('open');}
+function closeLightbox(){document.getElementById('lightbox-overlay').classList.remove('open');}
+function deletePaymentModal(id){ const p=db.payments.find(p=>p.id===id); if(!p) return; const t=db.tenants.find(t=>t.id===p.tenantId); document.getElementById('delete-pay-id').value=id; document.getElementById('delete-pay-msg').innerHTML=`Delete payment of <strong>${fmt(p.amount)}</strong> on ${p.date}${t?` for ${esc(t.name)}`:''}?`; document.getElementById('modal-delete-pay').classList.add('open');}
+function confirmDeletePayment(){ const id=document.getElementById('delete-pay-id').value; db.payments=db.payments.filter(p=>p.id!==id); saveDB(); closeModals(); renderFinance(); renderDashboard(); toast('Payment deleted');}
+function showReceipt(payId){ const p=db.payments.find(p=>p.id===payId); if(!p) return; const t=db.tenants.find(t=>t.id===p.tenantId); if(!t) return; const bed=db.beds.find(b=>b.id===t.bedId); const room=bed?db.rooms.find(r=>r.id===bed.roomId):null; const house=room?db.houses.find(h=>h.id===room.houseId):null; document.getElementById('receipt-body').innerHTML=`<div class="receipt-preview"><div class="receipt-header"><div style="font-size:22px;margin-bottom:6px">🏠</div><div style="font-weight:700;font-size:15px">${esc(house?.name||'Lodge Manager')}</div>${house?.addr?`<div style="font-size:11px;color:var(--ink-3);margin-top:2px">${esc(house.addr)}</div>`:''}<div style="font-size:11px;color:var(--ink-3);margin-top:3px">Official Payment Receipt</div></div><div class="receipt-row"><span>Tenant</span><span>${esc(t.name)}</span></div><div class="receipt-row"><span>Phone</span><span>${esc(t.phone||'—')}</span></div><div class="receipt-row"><span>Room / Bed</span><span>${esc(room?.name||'—')} / ${esc(bed?.label||'—')}</span></div><div class="receipt-row"><span>Payment Date</span><span>${p.date}</span></div>${p.note?`<div class="receipt-row"><span>Note</span><span>${esc(p.note)}</span></div>`:''}<div class="receipt-row"><span>Receipt #</span><span>${p.id.slice(-8).toUpperCase()}</span></div><div class="receipt-total"><span>Amount Paid</span><span>${fmt(p.amount)}</span></div><div style="margin-top:12px;font-size:10px;color:var(--ink-3);text-align:center">Printed on ${new Date().toISOString().slice(0,10)} &nbsp;•&nbsp; Lodge Manager v3</div></div>`; document.getElementById('modal-receipt').classList.add('open');}
+function exportCSV(){ const BOM='\uFEFF'; let rows=[['Tenant Name','Phone','Amount (K)','Date','Note','House','Room','Bed']]; db.payments.forEach(p=>{const t=db.tenants.find(t=>t.id===p.tenantId); const bed=t?db.beds.find(b=>b.id===t.bedId):null; const room=bed?db.rooms.find(r=>r.id===bed.roomId):null; const house=room?db.houses.find(h=>h.id===room.houseId):null; rows.push([`"${t?.name||'Unknown'}"`,`"${t?.phone||''}"`,p.amount,p.date,`"${p.note||''}"`,`"${house?.name||''}"`,`"${room?.name||''}"`,`"${bed?.label||''}"`]);}); const blob=new Blob([BOM+rows.map(r=>r.join(',')).join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`payments_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); toast('CSV exported');}
+
+/* ── EXPENSES ── */
+function renderExpenses(){
+  const total=db.expenses.reduce((s,e)=>s+e.amount,0);
+  const t30=new Date(); t30.setDate(t30.getDate()-30);
+  const e30=db.expenses.filter(e=>new Date(e.date)>=t30).reduce((s,e)=>s+e.amount,0);
+  document.getElementById('exp-total').textContent=fmt(total);
+  document.getElementById('exp-30').textContent=fmt(e30);
+  document.getElementById('exp-count').textContent=db.expenses.length;
+  const hsel=document.getElementById('exp-house'); hsel.innerHTML='<option value="">All Houses</option>'+db.houses.map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('');
+  const dateEl=document.getElementById('exp-date'); if(!dateEl.value) dateEl.value=new Date().toISOString().slice(0,10);
+  const catIcons={'Utilities (Water)':'💧','Utilities (Electricity)':'⚡','Maintenance / Repairs':'🔧','Caretaker / Staff':'👷','Insurance':'🛡️','Security':'🔒','Rates / Council':'🏛️','Other':'📦'};
+  const sorted=[...db.expenses].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const el=document.getElementById('expense-list');
+  if(sorted.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No expenses yet</div><div class="empty-sub">Add your first expense on the left</div></div>`;return;}
+  el.innerHTML=sorted.map(e=>{ const house=e.houseId?db.houses.find(h=>h.id===e.houseId):null; return`<div class="expense-row"><div class="expense-cat"><div class="expense-icon">${catIcons[e.category]||'📦'}</div><div><div style="font-size:13px;font-weight:600">${esc(e.category)}</div><div style="font-size:11px;color:var(--ink-3)">${e.date}${e.desc?` • ${esc(e.desc)}`:''}${house?` • ${esc(house.name)}`:''}</div></div></div><div style="display:flex;align-items:center;gap:7px;flex-shrink:0"><span style="font-weight:700;color:var(--red)">${fmt(e.amount)}</span><button class="btn-icon" onclick="deleteExpense('${e.id}')" title="Delete expense"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div></div>`;}).join('');
+}
+function addExpense(){ const cat=document.getElementById('exp-cat').value; const amt=parseFloat(document.getElementById('exp-amount').value); const date=document.getElementById('exp-date').value; const houseId=document.getElementById('exp-house').value||null; const desc=document.getElementById('exp-desc').value.trim(); if(isNaN(amt)||amt<=0){toast('Enter a valid amount',true);return;} if(!date){toast('Select a date',true);return;} db.expenses.push({id:genId(),category:cat,amount:amt,date,houseId,desc}); saveDB(); renderExpenses(); renderDashboard(); document.getElementById('exp-amount').value=''; document.getElementById('exp-desc').value=''; toast(`${fmt(amt)} expense added`);}
+function deleteExpense(id){ if(!confirm('Delete this expense record?')) return; db.expenses=db.expenses.filter(e=>e.id!==id); saveDB(); renderExpenses(); renderDashboard(); toast('Expense deleted');}
+
+/* ── MAINTENANCE ── */
+function renderMaintenance(){
+  updateMaintBadge();
+  const requests=[...clientData.maintenanceRequests].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const el=document.getElementById('maint-list-admin');
+  if(requests.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">🔧</div><div class="empty-title">No maintenance requests</div><div class="empty-sub">Requests from tenants via the client portal will appear here</div></div>`;return;}
+  const urgencyColors={low:'badge-green',medium:'badge-amber',high:'badge-red',emergency:'badge-red'};
+  el.innerHTML=requests.map(r=>{ const t=db.tenants.find(t=>t.id===r.tenantId); const statusMap={open:'badge-amber',inprogress:'badge-blue',resolved:'badge-green'}; const statusLabel={open:'Open',inprogress:'In Progress',resolved:'Resolved'}; return`<div class="maint-card"><div class="maint-top"><div style="flex:1"><div class="maint-title">${esc(r.title)}</div>${r.desc?`<div style="font-size:12px;color:var(--ink-2);margin-top:3px">${esc(r.desc)}</div>`:''}</div><div style="display:flex;gap:5px;align-items:flex-start;flex-shrink:0"><span class="badge ${statusMap[r.status]||'badge-gray'}">${statusLabel[r.status]||r.status}</span></div></div><div class="maint-meta"><span>📅 ${r.date}</span><span>📂 ${esc(r.category)}</span>${r.urgency?`<span class="badge ${urgencyColors[r.urgency]||'badge-gray'}" style="font-size:9px">${r.urgency.charAt(0).toUpperCase()+r.urgency.slice(1)}</span>`:''}${t?`<span>👤 ${esc(t.name)}</span>`:''}</div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">${r.status!=='inprogress'?`<button class="btn btn-ghost btn-xs" onclick="setMaintStatus('${r.id}','inprogress')">Mark In Progress</button>`:''}${r.status!=='resolved'?`<button class="btn btn-xs" style="background:#f0fdf4;color:#15803d;border:1px solid #86efac" onclick="setMaintStatus('${r.id}','resolved')">Mark Resolved</button>`:''}${r.status!=='open'?`<button class="btn btn-xs" style="background:var(--surface);color:var(--ink-3);border:1px solid var(--border)" onclick="setMaintStatus('${r.id}','open')">Reopen</button>`:''}<button class="btn btn-xs btn-danger" onclick="deleteMaint('${r.id}')">Delete</button></div></div>`;}).join('');
+}
+function setMaintStatus(id,status){ const idx=clientData.maintenanceRequests.findIndex(r=>r.id===id); if(idx>-1){clientData.maintenanceRequests[idx].status=status;saveClientDB();renderMaintenance();updateMaintBadge();toast(`Marked ${status}`);}}
+function deleteMaint(id){ clientData.maintenanceRequests=clientData.maintenanceRequests.filter(r=>r.id!==id); saveClientDB(); renderMaintenance(); updateMaintBadge(); toast('Request deleted');}
+
+/* ── NOTICES ── */
+function renderNotices(){
+  const el=document.getElementById('notices-list');
+  if(clientData.notices.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">📌</div><div class="empty-title">No notices posted yet</div><div class="empty-sub">Tenants will see notices in their portal</div></div>`;return;}
+  el.innerHTML=[...clientData.notices].reverse().map(n=>`<div class="notice-card"><div class="notice-title">${esc(n.title)}</div><div class="notice-body">${esc(n.body)}</div><div class="notice-meta"><span>📅 ${n.date}</span><button class="btn btn-xs btn-danger" onclick="deleteNotice('${n.id}')">Delete</button></div></div>`).join('');
+}
+function postNotice(){ const title=document.getElementById('notice-title').value.trim(); const body=document.getElementById('notice-body').value.trim(); if(!title){toast('Enter a title',true);return;} if(!body){toast('Enter a message',true);return;} clientData.notices.push({id:genId(),title,body,date:new Date().toISOString().slice(0,10)}); saveClientDB(); renderNotices(); document.getElementById('notice-title').value=''; document.getElementById('notice-body').value=''; toast('Notice posted to tenant portal');}
+function deleteNotice(id){ clientData.notices=clientData.notices.filter(n=>n.id!==id); saveClientDB(); renderNotices(); toast('Notice deleted');}
+
+/* ── HOUSE / ROOM / BED MODALS ── */
+function openHouseModal(id=null){ const nf=document.getElementById('new-house-fields'); document.getElementById('edit-house-id').value=''; document.getElementById('h-name').value=''; document.getElementById('h-addr').value=''; document.getElementById('h-rooms').value=2; document.getElementById('h-beds').value=3; if(id){ const h=db.houses.find(h=>h.id===id); if(h){document.getElementById('house-modal-title').textContent='Edit House';document.getElementById('edit-house-id').value=id;document.getElementById('h-name').value=h.name;document.getElementById('h-addr').value=h.addr||'';nf.style.display='none';} } else {document.getElementById('house-modal-title').textContent='Add New House';nf.style.display='';} document.getElementById('modal-house').classList.add('open');}
+function saveHouse(){ const id=document.getElementById('edit-house-id').value; const name=document.getElementById('h-name').value.trim(); const addr=document.getElementById('h-addr').value.trim(); if(!name){toast('House name required',true);return;} if(id){ const idx=db.houses.findIndex(h=>h.id===id); if(idx>-1) db.houses[idx]={...db.houses[idx],name,addr}; toast(`"${name}" updated`); } else { const rc=Math.min(parseInt(document.getElementById('h-rooms').value)||1,20); const bc=Math.min(parseInt(document.getElementById('h-beds').value)||1,20); const hid=genId(); db.houses.push({id:hid,name,addr}); for(let r=1;r<=rc;r++){ const rid=genId(); db.rooms.push({id:rid,houseId:hid,name:`Room ${r}`}); for(let b=1;b<=bc;b++) db.beds.push({id:genId(),roomId:rid,houseId:hid,label:`Bed ${b}`,tenantId:null});} toast(`"${name}" created`); } saveDB(); closeModals(); renderHouses(); renderDashboard();}
+function deleteHouse(id){ const h=db.houses.find(h=>h.id===id); if(!h) return; document.getElementById('delete-house-id').value=id; document.getElementById('delete-house-msg').innerHTML=`Delete <strong>${esc(h.name)}</strong> and all its data?`; document.getElementById('modal-delete-house').classList.add('open');}
+function confirmDeleteHouse(){ const id=document.getElementById('delete-house-id').value; const rids=db.rooms.filter(r=>r.houseId===id).map(r=>r.id); const bids=db.beds.filter(b=>rids.includes(b.roomId)).map(b=>b.id); const tids=db.tenants.filter(t=>bids.includes(t.bedId)).map(t=>t.id); db.payments=db.payments.filter(p=>!tids.includes(p.tenantId)); db.tenants=db.tenants.filter(t=>!tids.includes(t.id)); db.beds=db.beds.filter(b=>!bids.includes(b.id)); db.rooms=db.rooms.filter(r=>!rids.includes(r.id)); db.houses=db.houses.filter(h=>h.id!==id); saveDB(); closeModals(); renderAll(); toast('House deleted');}
+function openRenameRoom(id,name){ document.getElementById('rename-room-id').value=id; document.getElementById('rename-room-val').value=name; document.getElementById('modal-rename-room').classList.add('open');}
+function saveRoomName(){ const id=document.getElementById('rename-room-id').value; const val=document.getElementById('rename-room-val').value.trim(); if(!val){toast('Enter a room name',true);return;} const idx=db.rooms.findIndex(r=>r.id===id); if(idx>-1){db.rooms[idx].name=val;saveDB();closeModals();renderHouses();toast('Room renamed');}}
+function addBed(roomId,houseId){ const n=db.beds.filter(b=>b.roomId===roomId).length+1; db.beds.push({id:genId(),roomId,houseId,label:`Bed ${n}`,tenantId:null}); saveDB(); renderHouses(); toast(`Bed ${n} added`);}
+function removeBed(roomId){ const beds=db.beds.filter(b=>b.roomId===roomId); const last=beds[beds.length-1]; if(!last) return; if(last.tenantId){toast('Cannot remove an occupied bed',true);return;} db.beds=db.beds.filter(b=>b.id!==last.id); saveDB(); renderHouses(); toast('Bed removed');}
+
+/* ── TENANT MODAL ── */
+function openTenantModal(bedId){ const bed=db.beds.find(b=>b.id===bedId); if(!bed) return; document.getElementById('edit-bed-id').value=bedId; const tenant=bed.tenantId?db.tenants.find(t=>t.id===bed.tenantId):null; document.getElementById('tenant-modal-title').textContent=tenant?'Edit Tenant':'Assign Tenant'; document.getElementById('t-name').value=tenant?.name||''; document.getElementById('t-phone').value=tenant?.phone||''; document.getElementById('t-rent').value=tenant?.rent||1200; document.getElementById('t-dueday').value=tenant?.dueDay||1; document.getElementById('t-lease').value=tenant?.leaseStart||new Date().toISOString().slice(0,10); document.getElementById('t-portalpin').value=tenant?.portalPin||''; document.getElementById('t-notes').value=tenant?.notes||''; document.getElementById('modal-tenant').classList.add('open');}
+function saveTenant(){ const bedId=document.getElementById('edit-bed-id').value; const name=document.getElementById('t-name').value.trim(); const phone=document.getElementById('t-phone').value.trim(); const rent=parseFloat(document.getElementById('t-rent').value); const dueDay=Math.min(parseInt(document.getElementById('t-dueday').value)||1,28); const leaseStart=document.getElementById('t-lease').value; const portalPin=document.getElementById('t-portalpin').value.trim(); const notes=document.getElementById('t-notes').value.trim(); if(!name){toast('Name is required',true);return;} if(isNaN(rent)||rent<=0){toast('Enter a valid rent amount',true);return;} if(portalPin&&!/^\d{4,6}$/.test(portalPin)){toast('Portal PIN must be 4–6 digits, or leave blank',true);return;} const bed=db.beds.find(b=>b.id===bedId); if(!bed) return; if(bed.tenantId){ const idx=db.tenants.findIndex(t=>t.id===bed.tenantId); if(idx>-1){db.tenants[idx]={...db.tenants[idx],name,phone,rent,dueDay,leaseStart,portalPin,notes};toast(`${name} updated`);} } else { const newId=genId(); db.tenants.push({id:newId,bedId,name,phone,rent,dueDay,leaseStart:leaseStart||new Date().toISOString().slice(0,10),portalPin,notes}); bed.tenantId=newId; toast(`${name} assigned`);} saveDB(); closeModals(); renderAll();}
+function openVacateModal(bedId){ const bed=db.beds.find(b=>b.id===bedId); if(!bed||!bed.tenantId) return; const t=db.tenants.find(t=>t.id===bed.tenantId); if(!t) return; document.getElementById('vacate-bed-id').value=bedId; document.getElementById('vacate-msg').innerHTML=`Remove <strong>${esc(t.name)}</strong> from ${esc(bed.label)} and delete all their payment history?`; document.getElementById('modal-vacate').classList.add('open');}
+function confirmVacate(){ const bedId=document.getElementById('vacate-bed-id').value; const bed=db.beds.find(b=>b.id===bedId); if(!bed?.tenantId) return; db.payments=db.payments.filter(p=>p.tenantId!==bed.tenantId); db.tenants=db.tenants.filter(t=>t.id!==bed.tenantId); bed.tenantId=null; saveDB(); closeModals(); renderAll(); toast('Tenant vacated');}
+
+/* ── BACKUP / RESTORE ── */
+function exportBackup(){ const payload={version:3,exportedAt:new Date().toISOString(),db,clientData}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lodge_backup_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); toast('Backup exported');}
+function importBackup(event){ const file=event.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=e=>{ try{ const payload=JSON.parse(e.target.result); if(!payload.db||!payload.db.houses) throw new Error('Invalid backup file'); if(!confirm(`This will overwrite ALL current data with the backup from ${payload.exportedAt?.slice(0,10)||'unknown date'}. Continue?`)) return; db=payload.db; if(!db.expenses) db.expenses=[]; if(payload.clientData) clientData=payload.clientData; if(!clientData.paymentProofs) clientData.paymentProofs=[]; saveDB(); saveClientDB(); renderAll(); toast('Backup restored');} catch(err){toast('Invalid backup file',true);} }; reader.readAsText(file); event.target.value='';}
+function nukeData(){ if(!confirm('This will permanently delete ALL houses, tenants, payments, and expenses. There is no undo.\n\nType DELETE to confirm.')) return; const input=prompt('Type DELETE to confirm:'); if(input!=='DELETE') return; localStorage.removeItem(STORE_KEY); localStorage.removeItem(CLIENT_KEY); location.reload();}
+
+/* ── MODALS / TOAST ── */
+function closeModals(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));}
+document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals();}));
+let toastTimer;
+function toast(msg,err){ const el=document.getElementById('toast'); el.textContent=msg; el.style.background=err?'var(--red)':'var(--green-deep)'; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2800);}
+
+/* ── RENDER ALL + INIT ── */
+function renderAll(){ renderDashboard(); renderHouses(); renderTenants(); renderFinance(); renderExpenses(); renderMaintenance(); renderNotices(); }
+document.getElementById('tenant-search').addEventListener('input',renderTenants);
+document.getElementById('finance-search').addEventListener('input',renderFinance);
+
+loadDB();
+</script>
+</body>
+</html>
